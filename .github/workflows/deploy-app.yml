@@ -35,20 +35,7 @@ jobs:
       - name: Cargar outputs en variables de entorno
         run: |
           echo "EC2_IP=$(cat ./outputs/ec2_ip.txt)" >> $GITHUB_ENV
-          echo "DB_HOST=$(cat ./outputs/db_host.txt)" >> $GITHUB_ENV
-
-      - name: Configurar AWS CLI
-        run: |
-          aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws configure set aws_session_token ${{ secrets.AWS_SESSION_TOKEN }}
-          aws configure set default.region us-east-1
-
-      - name: Actualizar API URL en frontend
-        run: |
-          API_URL="http://${{ env.EC2_IP }}:8080"
-          sed -i "s|http://[0-9\.]*:8080|$API_URL|g" ./frontend/index.html
-          sed -i "s|http://[0-9\.]*:8080|$API_URL|g" ./frontend/joke.html
+          echo "DB_HOST=$(cat ./outputs/rds_endpoint.txt)" >> $GITHUB_ENV
 
       - name: Log in a DockerHub
         run: echo "${{ secrets.DOCKERHUB_PASSWORD }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
@@ -64,13 +51,11 @@ jobs:
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/frontend-app
 
       - name: Preparar clave SSH
-        run: |
-          cp infra/pr4-key.pem ./pr4-key.pem
-          chmod 600 ./pr4-key.pem
+        run: chmod 600 ./infra/pr4-key.pem
 
       - name: Deploy en EC2 con Docker Compose
         run: |
-          ssh -o StrictHostKeyChecking=no -i ./pr4-key.pem ubuntu@${{ env.EC2_IP }} << EOF
+          ssh -o StrictHostKeyChecking=no -i ./infra/pr4-key.pem ubuntu@${{ env.EC2_IP }} << EOF
             mkdir -p ~/PR4
 
             cat > ~/PR4/docker-compose.yml <<EOL
@@ -99,6 +84,7 @@ jobs:
             sudo docker-compose pull
             sudo docker-compose up -d --build
           EOF
+
 
 
 
