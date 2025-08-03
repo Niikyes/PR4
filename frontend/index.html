@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Contacts</title>
+</head>
+<body>
+  <h1>Contacts</h1>
+  <input type="text" id="name" placeholder="Name" />
+  <input type="text" id="phone" placeholder="Phone" />
+  <button onclick="saveContact()">Save</button>
+
+  <h2>Saved Contacts</h2>
+  <ul id="contacts"></ul>
+
+  <hr />
+  <button onclick="window.location.href='joke.html'">😂 Cuéntame un chiste</button>
+
+  <script>
+    const API_URL = "http://3.221.43.182:8080";
+
+    async function fetchContacts() {
+      const res = await fetch(`${API_URL}/api/contacts`);
+      const contacts = await res.json();
+      const list = document.getElementById("contacts");
+      list.innerHTML = contacts.map(c => `<li>${c.name} - ${c.phone}</li>`).join("");
+    }
+
+    async function saveContact() {
+      const name = document.getElementById("name").value;
+      const phone = document.getElementById("phone").value;
+      await fetch(`${API_URL}/api/contacts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, phone }),
+      });
+      fetchContacts();
+    }
+
+    fetchContacts();
+  </script>
+</body>
+</html>
+

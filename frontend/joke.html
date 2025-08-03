@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Chiste de Programación</title>
+</head>
+<body>
+  <h1>😂 Tu chiste de programación</h1>
+  <p id="joke">Cargando chiste...</p>
+
+  <button onclick="window.location.href='index.html'">⬅ Volver</button>
+
+  <script>
+    fetch('http://3.221.43.182:8080/api/joke')
+      .then(response => response.json())
+      .then(data => {
+        document.getElementById('joke').innerText =
+          data.type === 'single'
+            ? data.joke
+            : `${data.setup}\n\n${data.delivery}`;
+      })
+      .catch(err => {
+        document.getElementById('joke').innerText = 'Error al obtener el chiste';
+      });
+  </script>
+</body>
+</html>
+
