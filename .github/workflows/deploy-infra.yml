@@ -4,23 +4,17 @@ on:
   push:
     branches:
       - test
+    paths:
+      - 'infra/**'   # Solo se ejecuta si se cambia algo dentro de /infra
 
 jobs:
   terraform:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Clonar el código del repo
-      - name: Checkout del repositorio
+      - name: Checkout repo
         uses: actions/checkout@v3
 
-      # 2️⃣ Instalar Terraform
-      - name: Configurar Terraform
-        uses: hashicorp/setup-terraform@v2
-        with:
-          terraform_version: 1.12.2
-
-      # 3️⃣ Configurar AWS CLI con credenciales Educate
       - name: Configurar AWS CLI
         run: |
           aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -28,19 +22,18 @@ jobs:
           aws configure set aws_session_token ${{ secrets.AWS_SESSION_TOKEN }}
           aws configure set default.region us-east-1
 
-      # 4️⃣ Inicializar Terraform
+      - name: Instalar Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.12.2
+
       - name: Inicializar Terraform
         run: terraform -chdir=infra init
 
-      # 5️⃣ Plan Terraform (para revisar cambios)
-      - name: Plan Terraform
+      - name: Planificar Terraform
         run: terraform -chdir=infra plan
 
-      # 6️⃣ Aplicar Terraform
-      - name: Aplicar Terraform
+      - name: Aplicar Terraform (auto-aprobado)
         run: terraform -chdir=infra apply -auto-approve
-
-      # 7️⃣ Mostrar outputs
-      - name: Mostrar Outputs
-        run: terraform -chdir=infra output
+ 
 
