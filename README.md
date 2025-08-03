@@ -75,5 +75,5 @@ Se usan **dos workflows independientes**:
 - Publica en **DockerHub**.
 - Obtiene la **IP EC2** y **endpoint de RDS** de Terraform.
 - Reemplaza dinámicamente en el frontend (`index.html` y `joke.html`) la IP de la API:
-  ```javascript
+  ```javascripts
   const API_URL = "http://<EC2_PUBLIC_IP>:8080";
