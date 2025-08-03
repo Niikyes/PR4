@@ -23,6 +23,11 @@ jobs:
           aws configure set aws_session_token ${{ secrets.AWS_SESSION_TOKEN }}
           aws configure set default.region us-east-1
 
+      - name: Instalar Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.12.2
+
       - name: Obtener outputs de Terraform
         run: |
           EC2_IP=$(terraform -chdir=infra output -raw ec2_public_ip)
@@ -83,5 +88,6 @@ jobs:
             sudo docker-compose pull
             sudo docker-compose up -d --build
           EOF
+
 
 
