@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Clonar el repo
+      #Clonar el repo
       - name: Checkout repo
         uses: actions/checkout@v3
 
