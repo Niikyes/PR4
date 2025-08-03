@@ -20,7 +20,7 @@ resource "local_file" "pr4_private_key" {
   filename = "${path.module}/pr4-key.pem"
 }
 
-# --------------------------
+# ---------------------------
 # VPC y Red
 # --------------------------
 resource "aws_vpc" "pr4_vpc" {
