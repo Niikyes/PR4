@@ -1,0 +1,46 @@
+name: Deploy Infraestructura AWS (PR4)
+
+on:
+  push:
+    branches:
+      - test
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1️⃣ Clonar el código del repo
+      - name: Checkout del repositorio
+        uses: actions/checkout@v3
+
+      # 2️⃣ Instalar Terraform
+      - name: Configurar Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.12.2
+
+      # 3️⃣ Configurar AWS CLI con credenciales Educate
+      - name: Configurar AWS CLI
+        run: |
+          aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws configure set aws_session_token ${{ secrets.AWS_SESSION_TOKEN }}
+          aws configure set default.region us-east-1
+
+      # 4️⃣ Inicializar Terraform
+      - name: Inicializar Terraform
+        run: terraform -chdir=infra init
+
+      # 5️⃣ Plan Terraform (para revisar cambios)
+      - name: Plan Terraform
+        run: terraform -chdir=infra plan
+
+      # 6️⃣ Aplicar Terraform
+      - name: Aplicar Terraform
+        run: terraform -chdir=infra apply -auto-approve
+
+      # 7️⃣ Mostrar outputs
+      - name: Mostrar Outputs
+        run: terraform -chdir=infra output
+

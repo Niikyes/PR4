@@ -1,0 +1,94 @@
+name: CI/CD - Build, Push y Deploy en EC2 (PR4)
+
+on:
+  push:
+    branches:
+      - test
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1️⃣ Clonar el repo
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      # 2️⃣ Log in a DockerHub
+      - name: Log in to DockerHub
+        run: echo "${{ secrets.DOCKERHUB_PASSWORD }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+
+      # 3️⃣ Configurar AWS CLI y obtener outputs de Terraform
+      - name: Instalar y configurar AWS CLI
+        run: |
+          sudo apt-get install -y awscli
+          aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws configure set aws_session_token ${{ secrets.AWS_SESSION_TOKEN }}
+          aws configure set default.region us-east-1
+
+      - name: Obtener outputs de Terraform
+        run: |
+          EC2_IP=$(terraform -chdir=infra output -raw ec2_public_ip)
+          DB_HOST=$(terraform -chdir=infra output -raw rds_endpoint)
+          echo "EC2_IP=$EC2_IP" >> $GITHUB_ENV
+          echo "DB_HOST=$DB_HOST" >> $GITHUB_ENV
+
+      # 4️⃣ Actualizar URLs en frontend dinámicamente
+      - name: Actualizar API URL en frontend
+        run: |
+          API_URL="http://${{ env.EC2_IP }}:8080"
+          sed -i "s|http://[0-9\.]*:8080|$API_URL|g" ./frontend/index.html
+          sed -i "s|http://[0-9\.]*:8080|$API_URL|g" ./frontend/joke.html
+
+      # 5️⃣ Construir y publicar imágenes en DockerHub
+      - name: Build and push backend image
+        run: |
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/backend-app ./backend
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/backend-app
+
+      - name: Build and push frontend image
+        run: |
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/frontend-app ./frontend
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/frontend-app
+
+      # 6️⃣ Preparar clave SSH generada por Terraform
+      - name: Preparar clave SSH
+        run: |
+          cp infra/pr4-key.pem ./pr4-key.pem
+          chmod 600 ./pr4-key.pem
+
+      # 7️⃣ Conectar a EC2 y desplegar con Docker Compose
+      - name: Deploy en EC2 con Docker Compose
+        run: |
+          ssh -o StrictHostKeyChecking=no -i ./pr4-key.pem ubuntu@${{ env.EC2_IP }} << EOF
+            mkdir -p ~/PR4
+
+            # Crear docker-compose.yml dinámico
+            cat > ~/PR4/docker-compose.yml <<EOL
+            version: '3.8'
+            services:
+              backend:
+                image: ${{ secrets.DOCKERHUB_USERNAME }}/backend-app:latest
+                container_name: backend_app
+                ports:
+                  - "8080:8080"
+                environment:
+                  - DB_HOST=${{ env.DB_HOST }}
+                  - DB_USER=postgres
+                  - DB_PASSWORD=12345678
+                  - DB_NAME=test
+                  - DB_PORT=5432
+              frontend:
+                image: ${{ secrets.DOCKERHUB_USERNAME }}/frontend-app:latest
+                container_name: frontend_app
+                ports:
+                  - "80:80"
+            EOL
+
+            cd ~/PR4
+            sudo docker-compose down --remove-orphans || true
+            sudo docker-compose pull
+            sudo docker-compose up -d --build
+          EOF
+
