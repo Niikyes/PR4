@@ -5,7 +5,7 @@ on:
     branches:
       - test
     paths:
-      - 'infra/**'   # Solo se ejecuta si se cambia algo dentro de /infra
+      - 'infra/**'
 
 jobs:
   terraform:
@@ -27,13 +27,22 @@ jobs:
         with:
           terraform_version: 1.12.2
 
-      - name: Inicializar Terraform
-        run: terraform -chdir=infra init
+      - name: Inicializar y aplicar Terraform
+        run: |
+          terraform -chdir=infra init
+          terraform -chdir=infra apply -auto-approve
 
-      - name: Planificar Terraform
-        run: terraform -chdir=infra plan
+      - name: Exportar outputs de Terraform
+        run: |
+          terraform -chdir=infra output -raw ec2_public_ip > ec2_ip.txt
+          terraform -chdir=infra output -raw rds_endpoint > db_host.txt
 
-      - name: Aplicar Terraform (auto-aprobado)
-        run: terraform -chdir=infra apply -auto-approve
- 
+      - name: Subir outputs como artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: terraform-outputs
+          path: |
+            ec2_ip.txt
+            db_host.txt
+
 

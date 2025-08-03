@@ -1,9 +1,10 @@
-name: CI/CD - Build, Push y Deploy en EC2 (PR4)
+name: CI/CD Aplicación AWS (PR4)
 
 on:
-  push:
-    branches:
-      - test
+  workflow_run:
+    workflows: ["Deploy Infraestructura AWS (PR4)"]
+    types:
+      - completed
 
 jobs:
   deploy:
@@ -13,8 +14,15 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v3
 
-      - name: Log in to DockerHub
-        run: echo "${{ secrets.DOCKERHUB_PASSWORD }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+      - name: Descargar outputs de Terraform
+        uses: actions/download-artifact@v3
+        with:
+          name: terraform-outputs
+
+      - name: Cargar outputs en variables de entorno
+        run: |
+          echo "EC2_IP=$(cat ec2_ip.txt)" >> $GITHUB_ENV
+          echo "DB_HOST=$(cat db_host.txt)" >> $GITHUB_ENV
 
       - name: Configurar AWS CLI
         run: |
@@ -23,23 +31,14 @@ jobs:
           aws configure set aws_session_token ${{ secrets.AWS_SESSION_TOKEN }}
           aws configure set default.region us-east-1
 
-      - name: Instalar Terraform
-        uses: hashicorp/setup-terraform@v2
-        with:
-          terraform_version: 1.12.2
-
-      - name: Obtener outputs de Terraform
-        run: |
-          EC2_IP=$(terraform -chdir=infra output -raw ec2_public_ip)
-          DB_HOST=$(terraform -chdir=infra output -raw rds_endpoint)
-          echo "EC2_IP=$EC2_IP" >> $GITHUB_ENV
-          echo "DB_HOST=$DB_HOST" >> $GITHUB_ENV
-
       - name: Actualizar API URL en frontend
         run: |
           API_URL="http://${{ env.EC2_IP }}:8080"
           sed -i "s|http://[0-9\.]*:8080|$API_URL|g" ./frontend/index.html
           sed -i "s|http://[0-9\.]*:8080|$API_URL|g" ./frontend/joke.html
+
+      - name: Log in a DockerHub
+        run: echo "${{ secrets.DOCKERHUB_PASSWORD }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
 
       - name: Build and push backend image
         run: |
@@ -61,7 +60,6 @@ jobs:
           ssh -o StrictHostKeyChecking=no -i ./pr4-key.pem ubuntu@${{ env.EC2_IP }} << EOF
             mkdir -p ~/PR4
 
-            # Crear docker-compose.yml dinámico
             cat > ~/PR4/docker-compose.yml <<EOL
             version: '3.8'
             services:
@@ -88,6 +86,7 @@ jobs:
             sudo docker-compose pull
             sudo docker-compose up -d --build
           EOF
+
 
 
 
