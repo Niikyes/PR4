@@ -22,7 +22,7 @@ jobs:
       # 📥 Descargar outputs solo si vienen del workflow de infra
       - name: Descargar outputs de Terraform (si existen)
         if: ${{ github.event_name == 'workflow_run' }}
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: terraform-outputs
           path: ./outputs

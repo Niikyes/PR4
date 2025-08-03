@@ -38,7 +38,7 @@ jobs:
           terraform -chdir=infra output -raw rds_endpoint > db_host.txt
 
       - name: Subir outputs como artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: terraform-outputs
           path: |
