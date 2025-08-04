@@ -5,10 +5,7 @@ on:
     workflows: ["Deploy Infraestructura AWS (PR4)"]
     types:
       - completed
-  push:
-    branches:
-      - test
-  workflow_dispatch:  # 👈 Permite ejecutarlo manualmente desde Actions
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -18,23 +15,15 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v3
 
-      # Validar que los artifacts de Terraform existen
-      - name: Validar artifacts de Terraform
+      # 🔥 Descargar artifacts del último run exitoso del workflow de infraestructura
+      - name: Descargar artifacts de Terraform y SSH Key
         run: |
-          echo "Verificando artifacts de Terraform..."
-          if ! gh run download --name terraform-outputs --dir ./outputs; then
-            echo "❌ No se encontraron artifacts de Terraform. Deteniendo el flujo."
-            exit 1
-          fi
+          LATEST_RUN_ID=$(gh run list --workflow "Deploy Infraestructura AWS (PR4)" --branch test --json databaseId --jq '.[0].databaseId')
+          echo "Último run ID de infraestructura: $LATEST_RUN_ID"
+          gh run download $LATEST_RUN_ID --name terraform-outputs --dir ./outputs
+          gh run download $LATEST_RUN_ID --name ssh-key --dir ./infra
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      # Descargar clave SSH
-      - name: Descargar clave SSH
-        uses: actions/download-artifact@v4
-        with:
-          name: ssh-key
-          path: ./infra
 
       # Cargar outputs en variables de entorno
       - name: Cargar outputs
@@ -95,6 +84,7 @@ jobs:
             sudo docker-compose pull
             sudo docker-compose up -d --build
           EOF
+
 
 
 
