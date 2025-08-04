@@ -23,26 +23,62 @@ jobs:
           aws configure set default.region us-east-1
 
       # ================================
-      # LIMPIEZA BÁSICA DE AWS
+      # LIMPIEZA COMPLETA DE AWS
       # ================================
-      - name: Limpiar infraestructura existente en AWS
+      - name: 🧹 Limpiar infraestructura existente en AWS
         run: |
-          echo "🗑️ Eliminando RDS existentes..."
+          echo "🗑️ Eliminando instancias EC2..."
+          EC2S=$(aws ec2 describe-instances --query "Reservations[].Instances[].InstanceId" --output text)
+          for EC2 in $EC2S; do
+            echo "Eliminando EC2: $EC2"
+            aws ec2 terminate-instances --instance-ids $EC2 || true
+          done
+
+          echo "Esperando que las EC2 se terminen..."
+          for EC2 in $EC2S; do
+            aws ec2 wait instance-terminated --instance-ids $EC2 || true
+          done
+
+          echo "🗑️ Eliminando instancias RDS..."
           DBS=$(aws rds describe-db-instances --query "DBInstances[].DBInstanceIdentifier" --output text)
           for DB in $DBS; do
+            echo "Eliminando DB: $DB"
             aws rds delete-db-instance --db-instance-identifier $DB --skip-final-snapshot || true
+          done
+          for DB in $DBS; do
             aws rds wait db-instance-deleted --db-instance-identifier $DB || true
           done
 
-          echo "🗑️ Eliminando Subnet Groups..."
+          echo "🗑️ Eliminando DB Subnet Groups..."
           DB_SUBNETS=$(aws rds describe-db-subnet-groups --query "DBSubnetGroups[].DBSubnetGroupName" --output text)
           for DBSUB in $DB_SUBNETS; do
             aws rds delete-db-subnet-group --db-subnet-group-name $DBSUB || true
           done
 
+          echo "🗑️ Liberando Elastic IPs (EIPs)..."
+          EIPS=$(aws ec2 describe-addresses --query "Addresses[].AllocationId" --output text)
+          for EIP in $EIPS; do
+            aws ec2 release-address --allocation-id $EIP || true
+          done
+
+          echo "🗑️ Eliminando Key Pairs duplicadas..."
+          KEYS=$(aws ec2 describe-key-pairs --query "KeyPairs[].KeyName" --output text)
+          for KEY in $KEYS; do
+            if [[ "$KEY" == "pr4-key" ]]; then
+              aws ec2 delete-key-pair --key-name $KEY || true
+            fi
+          done
+
+          echo "🗑️ Eliminando interfaces de red (ENIs)..."
+          ENIS=$(aws ec2 describe-network-interfaces --query "NetworkInterfaces[].NetworkInterfaceId" --output text)
+          for ENI in $ENIS; do
+            aws ec2 delete-network-interface --network-interface-id $ENI || true
+          done
+
           echo "🗑️ Eliminando VPCs antiguas..."
           VPCS=$(aws ec2 describe-vpcs --query "Vpcs[].VpcId" --output text)
           for VPC in $VPCS; do
+            echo "Limpiando VPC: $VPC"
             SUBNETS=$(aws ec2 describe-subnets --filters "Name=vpc-id,Values=$VPC" --query "Subnets[].SubnetId" --output text)
             for SUB in $SUBNETS; do
               aws ec2 delete-subnet --subnet-id $SUB || true
@@ -54,12 +90,22 @@ jobs:
               aws ec2 delete-internet-gateway --internet-gateway-id $GW || true
             done
 
+            RTBS=$(aws ec2 describe-route-tables --filters "Name=vpc-id,Values=$VPC" --query "RouteTables[].RouteTableId" --output text)
+            for RTB in $RTBS; do
+              MAIN=$(aws ec2 describe-route-tables --route-table-ids $RTB --query "RouteTables[].Associations[].Main" --output text)
+              if [[ "$MAIN" != "True" ]]; then
+                aws ec2 delete-route-table --route-table-id $RTB || true
+              fi
+            done
+
+            SGS=$(aws ec2 describe-security-groups --filters "Name=vpc-id,Values=$VPC" --query "SecurityGroups[?GroupName!='default'].GroupId" --output text)
+            for SG in $SGS; do
+              aws ec2 delete-security-group --group-id $SG || true
+            done
+
             aws ec2 delete-vpc --vpc-id $VPC || true
           done
 
-      # ================================
-      # INSTALAR Y APLICAR TERRAFORM
-      # ================================
       - name: Instalar Terraform
         uses: hashicorp/setup-terraform@v2
         with:
@@ -88,6 +134,7 @@ jobs:
         with:
           name: ssh-key
           path: infra/pr4-key.pem
+
 
 
 
