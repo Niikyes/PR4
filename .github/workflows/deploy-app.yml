@@ -5,6 +5,7 @@ on:
     workflows: ["Deploy Infraestructura AWS (PR4)"]
     types:
       - completed
+  workflow_dispatch:  # 👈 Permite ejecutarlo manualmente desde la pestaña Actions
 
 jobs:
   deploy:
@@ -86,6 +87,7 @@ jobs:
             sudo docker-compose pull
             sudo docker-compose up -d --build
           EOF
+
 
 
 
