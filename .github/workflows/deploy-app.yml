@@ -1,21 +1,22 @@
 name: CI/CD Aplicación AWS (PR4)
 
 on:
+  workflow_dispatch: # Se puede ejecutar manualmente
   workflow_run:
     workflows: ["Deploy Infraestructura AWS (PR4)"]
     types:
       - completed
-  workflow_dispatch:
 
 jobs:
   deploy:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }} # ✅ Solo si deploy-infra fue exitoso
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
 
-      # 🔥 Descargar artifacts del último run exitoso del workflow de infraestructura
+      # Descargar artifacts del último run exitoso
       - name: Descargar artifacts de Terraform y SSH Key
         run: |
           LATEST_RUN_ID=$(gh run list --workflow "Deploy Infraestructura AWS (PR4)" --branch test --json databaseId --jq '.[0].databaseId')
@@ -25,17 +26,17 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # Cargar outputs en variables de entorno
+      # Cargar outputs
       - name: Cargar outputs
         run: |
           echo "EC2_IP=$(cat ./outputs/ec2_ip.txt)" >> $GITHUB_ENV
           echo "DB_HOST=$(cat ./outputs/rds_endpoint.txt)" >> $GITHUB_ENV
 
-      # Login a DockerHub
+      # Login DockerHub
       - name: Log in a DockerHub
         run: echo "${{ secrets.DOCKERHUB_PASSWORD }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
 
-      # Construir y subir imágenes
+      # Construir imágenes
       - name: Build and push backend image
         run: |
           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/backend-app ./backend
@@ -57,7 +58,6 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no -i ./pr4-key.pem ubuntu@${{ env.EC2_IP }} << EOF
             mkdir -p ~/PR4
-
             cat > ~/PR4/docker-compose.yml <<EOL
             version: '3.8'
             services:
@@ -78,12 +78,12 @@ jobs:
                 ports:
                   - "80:80"
             EOL
-
             cd ~/PR4
             sudo docker-compose down --remove-orphans || true
             sudo docker-compose pull
             sudo docker-compose up -d --build
           EOF
+
 
 
 

@@ -177,7 +177,7 @@ resource "aws_eip" "pr4_eip" {
 
 # =========================================================
 # 5. RDS PostgreSQL
-# =========================================================--
+# =========================================================---
 resource "aws_db_subnet_group" "pr4_db_subnet" {
   name       = "pr4-db-subnet-group"
   subnet_ids = [aws_subnet.private_subnet_a.id, aws_subnet.private_subnet_b.id]
