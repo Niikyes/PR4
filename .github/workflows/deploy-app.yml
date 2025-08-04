@@ -18,13 +18,18 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v3
 
-      # Descargar outputs y clave SSH desde artifacts
-      - name: Descargar outputs de Terraform
-        uses: actions/download-artifact@v4
-        with:
-          name: terraform-outputs
-          path: ./outputs
+      # Validar que los artifacts de Terraform existen
+      - name: Validar artifacts de Terraform
+        run: |
+          echo "Verificando artifacts de Terraform..."
+          if ! gh run download --name terraform-outputs --dir ./outputs; then
+            echo "❌ No se encontraron artifacts de Terraform. Deteniendo el flujo."
+            exit 1
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # Descargar clave SSH
       - name: Descargar clave SSH
         uses: actions/download-artifact@v4
         with:
@@ -90,6 +95,7 @@ jobs:
             sudo docker-compose pull
             sudo docker-compose up -d --build
           EOF
+
 
 
 
