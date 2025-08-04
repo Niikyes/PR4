@@ -3,33 +3,7 @@ provider "aws" {
 }
 
 # =========================================================
-# 0. Limpieza previa (RDS y VPC existentes)
-# =========================================================
-data "aws_vpcs" "existing" {}
-resource "null_resource" "delete_old_vpcs" {
-  provisioner "local-exec" {
-    command = <<EOT
-      for vpc in $(aws ec2 describe-vpcs --query 'Vpcs[].VpcId' --output text); do
-        echo "Deleting VPC $vpc..."
-        aws ec2 delete-vpc --vpc-id $vpc || true
-      done
-    EOT
-  }
-}
-
-resource "null_resource" "delete_old_rds" {
-  provisioner "local-exec" {
-    command = <<EOT
-      for db in $(aws rds describe-db-instances --query 'DBInstances[].DBInstanceIdentifier' --output text); do
-        echo "Deleting RDS $db..."
-        aws rds delete-db-instance --db-instance-identifier $db --skip-final-snapshot || true
-      done
-    EOT
-  }
-}
-
-# =========================================================
-# 1. Generar clave SSH
+# 1. Generar clave SSH (Key Pair)
 # =========================================================
 resource "tls_private_key" "pr4_key" {
   algorithm = "RSA"
@@ -39,6 +13,7 @@ resource "tls_private_key" "pr4_key" {
 resource "aws_key_pair" "pr4_key" {
   key_name   = "pr4-key"
   public_key = tls_private_key.pr4_key.public_key_openssh
+
   lifecycle {
     create_before_destroy = true
     ignore_changes        = [public_key]
@@ -130,6 +105,10 @@ resource "aws_security_group" "ec2_sg" {
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_security_group" "rds_sg" {
@@ -148,9 +127,13 @@ resource "aws_security_group" "rds_sg" {
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
-# =========================================================--
+# =========================================================
 # 4. EC2 Instance
 # =========================================================
 resource "aws_instance" "pr4_ec2" {
@@ -177,7 +160,7 @@ resource "aws_eip" "pr4_eip" {
 
 # =========================================================
 # 5. RDS PostgreSQL
-# =========================================================---
+# =========================================================
 resource "aws_db_subnet_group" "pr4_db_subnet" {
   name       = "pr4-db-subnet-group"
   subnet_ids = [aws_subnet.private_subnet_a.id, aws_subnet.private_subnet_b.id]
@@ -197,6 +180,9 @@ resource "aws_db_instance" "pr4_rds" {
   db_subnet_group_name   = aws_db_subnet_group.pr4_db_subnet.name
   publicly_accessible    = false
 }
+
+
+
 
 
 
